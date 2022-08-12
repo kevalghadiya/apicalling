@@ -1,0 +1,148 @@
+public class Keys {
+
+    public static final String WEB_ADDRESS = "base_url";
+    
+    public static final String SignIn = "apis/members/login";
+    
+   }
+   
+ ////////////////////////////////////////////////
+ public interface WebServices {
+    @FormUrlEncoded
+    @POST(Keys.SignIn)
+    Call<SignInModel> SignIn(@FieldMap Map<String, String> Map);
+}
+
+/////////////////////////////////////////////
+
+public class WebApiClient {
+    public static WebServices getInstance() {
+        HttpLoggingInterceptor httpLoggingInterceptor = new HttpLoggingInterceptor();
+        httpLoggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+        OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
+
+        httpClient.addInterceptor(httpLoggingInterceptor);  // <-- this is the important line!
+
+        httpClient.readTimeout(180, TimeUnit.SECONDS);
+        httpClient.connectTimeout(180, TimeUnit.SECONDS);
+        Gson gson = new GsonBuilder()
+                .setLenient()
+                .create();
+        Retrofit mRetrofit = new Retrofit.Builder()
+                .baseUrl(Keys.WEB_ADDRESS)
+                .client(httpClient.build())
+                .addConverterFactory(GsonConverterFactory.create(gson))
+                .build();
+        return mRetrofit.create(WebServices.class);
+    }
+ }
+////////////////////////////////////////////////////////////////
+
+ private void getSignIn() {
+        if (Utils.isInternetAvailable(mContext)) {
+            ProgressHubKt.showLoader(mContext);
+            WebApiClient.getInstance().SignIn(paramSignIn()).enqueue(new Callback<SignInModel>() {
+                @Override
+                public void onResponse(Call<SignInModel> call, Response<SignInModel> response) {
+                    ProgressHubKt.dismissLoader();
+                    Log.e("Response :", response.message() + "");
+                    if (response.code() == 200) {
+
+                        if (response.body().getStatus() ==1){
+
+                            PreferenceHelper.putString(Constants.USER_ID, response.body().data.getId());
+                            PreferenceHelper.putString(Constants.NAME, response.body().data.getName());
+                            PreferenceHelper.putBoolean(Constants.IS_LOGIN, true);
+
+                            Log.e("response", response.body() + "");
+                            Intent intent = new Intent(mContext, MainActivity.class);
+                            startActivity(intent);
+                            finish();
+
+                        }else {
+                            Toast.makeText(mContext, ""+response.body().getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+
+                    } else if (response.code() == 401) {
+                        new DialogUtils(mContext).showAlertDialog(getString(R.string.app_name), response.message(), getString(R.string.ok),
+                                "", "", 2, false);
+                    } else {
+                        new DialogUtils(mContext).showAlertDialog(getString(R.string.app_name), response.message(), getString(R.string.ok),
+                                "", "", 1, false);
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<SignInModel> call, Throwable t) {
+                    ProgressHubKt.dismissLoader();
+                    Log.e("error", Objects.requireNonNull(t.getMessage()));
+                    new DialogUtils(mContext).showAlertDialog(getString(R.string.app_name), "Something went wrong!", getString(R.string.ok),
+                            "", "", 1, false);
+                }
+            });
+        } else {
+            Utils.showDialogLong(mContext, "No Internet Connection! Please connect working internet.");
+        }
+    }
+
+    private Map<String, String> paramSignIn() {
+        Map<String, String> params = new HashMap<>();
+        params.put("api_key","vfuture@123");
+        params.put("email", binding.edtEmail.getText().toString());
+        params.put("password", binding.edtPassword.getText().toString());
+        return params;
+    }
+/////////////////////////////////////////////////////////////////////
+
+public class Constants {
+
+    public static final String APP_PREFERENCE_NAME = "VelluvomSharedPreference";
+    public static final String IS_LOGIN = "Login";
+   
+}
+
+//////////////////////////////////////////////////////////////////
+public class PreferenceHelper {
+
+    public static SharedPreferences VelluvomSharedPreference;
+
+    public static void putString(String key, String value) {
+        VelluvomSharedPreference = MyApplication.getAppContext()
+                .getSharedPreferences(Constants.APP_PREFERENCE_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = VelluvomSharedPreference.edit();
+        editor.putString(key, value);
+        editor.apply();
+    }
+
+    public static String getString(String key, String defaultValue) {
+        VelluvomSharedPreference = MyApplication.getAppContext()
+                .getSharedPreferences(Constants.APP_PREFERENCE_NAME, Context.MODE_PRIVATE);
+        return VelluvomSharedPreference.getString(key, defaultValue);
+    }
+}    
+ ////////////////////////////////////////////
+    params.put("user_id",PreferenceHelper.getString(Constants.USER_ID,""));
+    
+    //data get preference
+    PreferenceHelper.getString(Constants.USER_ID,"")
+    
+    //add data preference
+   PreferenceHelper.putString(Constants.USER_ID, response.body().data.getId());
+//////////////////////////////////////////////////////////////////////////////////
+
+//internet available
+ public static boolean isInternetAvailable(Context context) {
+        if (context != null) {
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            // test for connection
+            if (cm.getActiveNetworkInfo() != null
+                    && cm.getActiveNetworkInfo().isAvailable()
+                    && cm.getActiveNetworkInfo().isConnected()) {
+                return true;
+            } else {
+                return false;
+            }
+        } else return false;
+    }
+///////////////////////////////////////////////////////////////////////////////  
+    
